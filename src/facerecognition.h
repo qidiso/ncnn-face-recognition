@@ -21,12 +21,6 @@
 namespace bp = boost::python;
 using namespace std;
 
-struct RecogResult
-{
-    std::string name;
-    int rect[4];
-};
-
 struct AlignedFace
 {
     int rect[4];
@@ -43,6 +37,7 @@ public:
 
     bp::list recognize(int rows,int cols,bp::str img_data);
     int add_person(bp::str str, int rows,int cols,bp::str img_data);
+    int del_person(bp::str str);
 
 private:
     std::string modulepath;

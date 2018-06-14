@@ -34,15 +34,6 @@ cv::Mat getsrc_roi(std::vector<cv::Point2f> x0, std::vector<cv::Point2f> dst)
     return roi;
 }
 
-class NoFaceException: public exception
-{
-    virtual const char* what() const throw()
-    {
-        return "No face found";
-    }
-} noface;
-
-
 FaceRecognition::FaceRecognition(bp::str str, float thres)
 {
     modulepath = std::string(((const char *) bp::extract<const char *>(str)));
@@ -84,9 +75,6 @@ bp::list FaceRecognition::recognize(int rows,int cols,bp::str img_data)
         recog_result.append(res);
     }
 
-    //mobilefacenet->start(aligned_face, feature);
-    //std::string name = featuredb->find_name(feature);
-    //return name.c_str();
     return recog_result;
 }
 
@@ -95,12 +83,26 @@ int FaceRecognition::add_person(bp::str str, int rows,int cols,bp::str img_data)
     unsigned char *data = (unsigned char *) ((const char *) bp::extract<const char *>(img_data));
     std::string name = std::string(((const char *) bp::extract<const char *>(str)));
     cv::Mat img= cv::Mat(rows, cols, CV_8UC3,data);
+    std::vector<AlignedFace> aligned_face;
 
-//    cv::Mat aligned_face = align(img);
-    std::vector<float> feature;
-//    mobilefacenet->start(aligned_face, feature);
-//    featuredb->add_feature(name, feature);
+    const int num  = align(img, aligned_face);
+    cout << "add_person" << endl;
+    if (num == 1){
+        std::vector<float> feature;
+        mobilefacenet->start(aligned_face[0].face, feature);
+        return featuredb->add_feature(name, feature);
+    } else {
+        return -1;
+    }
 }
+
+int FaceRecognition::del_person(bp::str str)
+{
+    std::string name = std::string(((const char *) bp::extract<const char *>(str)));
+
+    return featuredb->del_feature(name);
+}
+
     
 int FaceRecognition::align(cv::Mat image, std::vector<AlignedFace> &aligned_face)
 {
@@ -147,7 +149,6 @@ BOOST_PYTHON_MODULE (facerecognition)
 {
     bp::class_<FaceRecognition>("FaceRecognition", bp::init<bp::str, float>())
             .def("add_person", &FaceRecognition::add_person)
+            .def("del_person", &FaceRecognition::del_person)
             .def("recognize", &FaceRecognition::recognize);
-
-    bp::class_<RecogResult>("RecogResult");
 }

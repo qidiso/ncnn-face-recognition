@@ -18,8 +18,8 @@ class FeatureDB {
 public:
     FeatureDB(const std::string path, float thres);
     ~FeatureDB();
-    void add_feature(const std::string name, std::vector<float> feature);
-    void del_feature(const std::string name);
+    int add_feature(const std::string name, std::vector<float> feature);
+    int del_feature(const std::string name);
     std::string find_name(std::vector<float> feature);
 private:
     void save_feature();

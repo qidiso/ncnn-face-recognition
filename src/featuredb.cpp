@@ -5,7 +5,6 @@
 #include "featuredb.h"
 
 
-
 FeatureDB::FeatureDB(const std::string path, float thres)
 {
     dbfile = path + "/feature.db";
@@ -18,15 +17,28 @@ FeatureDB::~FeatureDB()
     save_feature();
 }
 
-void FeatureDB::add_feature(const std::string name, std::vector<float> feature)
+int FeatureDB::add_feature(const std::string name, std::vector<float> feature)
 {
-    features.insert(map<string, vector<float>>::value_type(name, feature));
-    save_feature();
+    map<string, vector<float>>::iterator it = features.find(name);
+
+    if (it == features.end()) {
+        features.insert(map<string, vector<float>>::value_type(name, feature));
+        save_feature();
+	return 0;
+    } else
+	return -1;
 }
-void FeatureDB::del_feature(const std::string name)
+
+int FeatureDB::del_feature(const std::string name)
 {
-    features.erase(name);
-    save_feature();
+    map<string, vector<float>>::iterator it = features.find(name);
+
+    if (it != features.end()) {
+        features.erase(name);
+        save_feature();
+	return 0;
+    } else
+	return -1;
 }
 std::string FeatureDB::find_name(std::vector<float> feature)
 {
