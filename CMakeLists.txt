@@ -13,7 +13,7 @@ include_directories(/include
 	            ${CMAKE_CURRENT_LIST_DIR}/src)
 
 
-list(APPEND LINKER_LIBS opencv_core opencv_highgui opencv_imgproc opencv_video ncnn)
+list(APPEND LINKER_LIBS opencv_imgcodecs opencv_core opencv_highgui opencv_imgproc opencv_video ncnn)
 
 file(GLOB SRC ${CMAKE_CURRENT_LIST_DIR}/src/*.h
               ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp)
