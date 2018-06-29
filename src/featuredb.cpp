@@ -8,7 +8,7 @@
 
 FeatureDB::FeatureDB(const std::string path, float thres)
 {
-    dbfile = path + "feature.db";
+    dbfile = path + "/feature.db";
     threshold = thres;
 
     load_feature();
@@ -60,12 +60,12 @@ void FeatureDB::save_feature()
 
     it = features.begin();
     while(it != features.end()) {
-        of << it->first << " ";
-	cout << it->first << " ";
+        of << it->first << ",";
+	cout << it->first << ",";
 
 	for (int i = 0; i != it->second.size(); ++i) {
-            of << it->second[i] << " ";
-            cout << it->second[i] << " ";
+            of << it->second[i] << ",";
+            cout << it->second[i] << ",";
         }
 
 	of << endl;
@@ -75,7 +75,36 @@ void FeatureDB::save_feature()
 
 }
 void FeatureDB::load_feature()
-{}
+{
+    ifstream inf(dbfile);
+
+    if (!inf.is_open()) {
+        cout << "Error opening file" << endl;
+       	exit (1);
+    }
+
+    while (!inf.eof()) {
+	char buffer[4096];
+	std::string name;
+
+	inf.getline (buffer, 4096);
+	if (strlen(buffer) < 4)
+            continue;
+
+        char *token = strtok(buffer, ",");
+	name = token;
+
+        std::vector<float> feature;
+	float tmp;
+
+	while((token = strtok(NULL, ",")) != NULL) {
+	    tmp = atof(token);
+	    feature.push_back(tmp);
+	}
+
+	features.insert(map<string, vector<float>>::value_type(name, feature));
+    }
+}
 
 float FeatureDB::cal_similar(std::vector<float>& v1, std::vector<float>& v2)
 {

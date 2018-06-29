@@ -2,6 +2,7 @@
 #ifndef FEATUREDB_H_
 #define FEATUREDB_H_
 
+#include <string.h>
 #include <string>
 #include <fstream>
 #include <iostream>

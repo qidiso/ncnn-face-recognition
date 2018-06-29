@@ -19,9 +19,10 @@ class call_cpp(object):
         return self.itcom.ret_box_list()
 
 if __name__ == '__main__':
-    facerecog = facerecognition.facerecognition("../models/")
+    facerecog = facerecognition.FaceRecognition("../models/")
 
-    img = cv2.imread('1.jpg')
+    img = cv2.imread('6.png')
 
     image_char = img.astype(np.uint8).tostring()
-    facerecog.recognize(img.shape[0], img.shape[1], image_char)
+    #facerecog.recognize(img.shape[0], img.shape[1], image_char)
+    facerecog.add_person("gf", img.shape[0], img.shape[1], image_char)
