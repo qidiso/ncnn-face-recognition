@@ -6,10 +6,10 @@
 #include "opencv2/opencv.hpp"
 
 
-class Recognize {
+class MobileFaceNet {
 public:
-	Recognize(const std::string &model_path);
-	~Recognize();
+	MobileFaceNet(const std::string &model_path);
+	~MobileFaceNet();
 	void start(const cv::Mat& img, std::vector<float>&feature);
 private:
 	void RecogNet(ncnn::Mat& img_);
