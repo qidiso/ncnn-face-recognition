@@ -49,7 +49,7 @@ FaceRecognition::FaceRecognition(bp::str str)
     mtcnn = new MTCNN(modulepath);
     mobilefacenet = new MobileFaceNet(modulepath);
     featuredb = new FeatureDB(modulepath, 0.5);
-    std::cout << "communication init." << std::endl;
+    std::cout << "FaceRecognition Init Finished." << std::endl;
 }
 
 FaceRecognition::~FaceRecognition()
@@ -58,27 +58,29 @@ FaceRecognition::~FaceRecognition()
     delete mobilefacenet;
 }
 
-std::vector<RecogResult> FaceRecognition::recognize(int rows,int cols,bp::str img_data)
+bp::list FaceRecognition::recognize(int rows,int cols,bp::str img_data)
 {
     unsigned char *data = (unsigned char *) ((const char *) bp::extract<const char *>(img_data));
     cv::Mat img= cv::Mat(rows, cols, CV_8UC3,data);
     std::vector<AlignedFace> aligned_face;
-    std::vector<RecogResult> recog_result;
+    bp::list recog_result;
 
     const int num = align(img, aligned_face);
     for (int i = 0; i < num; i ++) {
         std::vector<float> feature;
-	RecogResult res;
-
-	cout << aligned_face[i].face.size() << endl;
+	std::string name;
+	bp::list rect;
+	bp::dict res;
 
 	mobilefacenet->start(aligned_face[i].face, feature);
-	res.name = featuredb->find_name(feature);
-        res.rect[0] = aligned_face[i].rect[0];
-        res.rect[1] = aligned_face[i].rect[1];
-	res.rect[2] = aligned_face[i].rect[2];
-	res.rect[3] = aligned_face[i].rect[3];
-        recog_result.push_back(res);
+	name = featuredb->find_name(feature);
+        rect.append(aligned_face[i].rect[0]);
+        rect.append(aligned_face[i].rect[1]);
+	rect.append(aligned_face[i].rect[2]);
+	rect.append(aligned_face[i].rect[3]);
+	res["name"] = name;
+	res["rect"] = rect;
+        recog_result.append(res);
     }
 
     //mobilefacenet->start(aligned_face, feature);
@@ -104,11 +106,6 @@ int FaceRecognition::align(cv::Mat image, std::vector<AlignedFace> &aligned_face
     double dst_landmark[10] = {
                 38.2946, 73.5318, 55.0252, 41.5493, 70.7299,
                 51.6963, 51.5014, 71.7366, 92.3655, 92.2041 };
-    vector<cv::Point2f>coord5points;
-    vector<cv::Point2f>facePointsByMtcnn;
-    for (int i = 0; i < 5; i++) {
-        coord5points.push_back(cv::Point2f(dst_landmark[i], dst_landmark[i + 5]));
-    }
 
     ncnn::Mat ncnn_img = ncnn::Mat::from_pixels(image.data, ncnn::Mat::PIXEL_BGR2RGB, image.cols, image.rows);
     std::vector<Bbox> bboxes;
@@ -119,13 +116,17 @@ int FaceRecognition::align(cv::Mat image, std::vector<AlignedFace> &aligned_face
     const int num_box = bboxes.size();
     for (int i = 0; i < num_box; i++) {
 	AlignedFace face;
+        vector<cv::Point2f> coord5points;
+        vector<cv::Point2f> facePointsByMtcnn;
+
         face.rect[0] = bboxes[i].x1;
         face.rect[1] = bboxes[i].y1;
 	face.rect[2] = bboxes[i].x2 - bboxes[i].x1 + 1;
 	face.rect[3] = bboxes[i].y2 - bboxes[i].y1 + 1;
 
-        for (int j = 0; j<5; j = j + 1){
+        for (int j = 0; j < 5; j ++) {
             facePointsByMtcnn.push_back(cvPoint(bboxes[i].ppoint[j], bboxes[i].ppoint[j + 5]));
+            coord5points.push_back(cv::Point2f(dst_landmark[i], dst_landmark[i + 5]));
         }
 
         cv::Mat warp_mat = estimateRigidTransform(facePointsByMtcnn, coord5points, false);

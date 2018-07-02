@@ -41,7 +41,7 @@ public:
     FaceRecognition(bp::str str);
     ~FaceRecognition();
 
-    std::vector<RecogResult> recognize(int rows,int cols,bp::str img_data);
+    bp::list recognize(int rows,int cols,bp::str img_data);
     int add_person(bp::str str, int rows,int cols,bp::str img_data);
 
 private:

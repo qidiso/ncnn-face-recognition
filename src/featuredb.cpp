@@ -40,13 +40,12 @@ std::string FeatureDB::find_name(std::vector<float> feature)
         if (similar > largest) {
             largest = similar;
             name = it->first;
-            cout<<it->first<<endl;
         }
 
         it ++;
     }
 
-    if (largest < threshold)
+    if (largest > threshold)
         return name;
     else
         return "";
@@ -61,15 +60,12 @@ void FeatureDB::save_feature()
     it = features.begin();
     while(it != features.end()) {
         of << it->first << ",";
-	cout << it->first << ",";
 
 	for (int i = 0; i != it->second.size(); ++i) {
             of << it->second[i] << ",";
-            cout << it->second[i] << ",";
         }
 
 	of << endl;
-        cout << endl;
         it ++;
     }
 
