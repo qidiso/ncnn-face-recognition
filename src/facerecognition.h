@@ -38,7 +38,7 @@ cv::Mat getsrc_roi(std::vector<cv::Point2f> x0, std::vector<cv::Point2f> dst);
 class FaceRecognition
 {
 public:
-    FaceRecognition(bp::str str);
+    FaceRecognition(bp::str str, float thres);
     ~FaceRecognition();
 
     bp::list recognize(int rows,int cols,bp::str img_data);

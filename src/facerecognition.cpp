@@ -43,12 +43,12 @@ class NoFaceException: public exception
 } noface;
 
 
-FaceRecognition::FaceRecognition(bp::str str)
+FaceRecognition::FaceRecognition(bp::str str, float thres)
 {
     modulepath = std::string(((const char *) bp::extract<const char *>(str)));
     mtcnn = new MTCNN(modulepath);
     mobilefacenet = new MobileFaceNet(modulepath);
-    featuredb = new FeatureDB(modulepath, 0.5);
+    featuredb = new FeatureDB(modulepath, thres);
     std::cout << "FaceRecognition Init Finished." << std::endl;
 }
 
@@ -56,6 +56,7 @@ FaceRecognition::~FaceRecognition()
 {
     delete mtcnn;
     delete mobilefacenet;
+    delete featuredb;
 }
 
 bp::list FaceRecognition::recognize(int rows,int cols,bp::str img_data)
@@ -126,7 +127,7 @@ int FaceRecognition::align(cv::Mat image, std::vector<AlignedFace> &aligned_face
 
         for (int j = 0; j < 5; j ++) {
             facePointsByMtcnn.push_back(cvPoint(bboxes[i].ppoint[j], bboxes[i].ppoint[j + 5]));
-            coord5points.push_back(cv::Point2f(dst_landmark[i], dst_landmark[i + 5]));
+            coord5points.push_back(cv::Point2f(dst_landmark[j], dst_landmark[j + 5]));
         }
 
         cv::Mat warp_mat = estimateRigidTransform(facePointsByMtcnn, coord5points, false);
@@ -144,7 +145,7 @@ int FaceRecognition::align(cv::Mat image, std::vector<AlignedFace> &aligned_face
 
 BOOST_PYTHON_MODULE (facerecognition)
 {
-    bp::class_<FaceRecognition>("FaceRecognition", bp::init<bp::str>())
+    bp::class_<FaceRecognition>("FaceRecognition", bp::init<bp::str, float>())
             .def("add_person", &FaceRecognition::add_person)
             .def("recognize", &FaceRecognition::recognize);
 
