@@ -24,9 +24,9 @@ int FeatureDB::add_feature(const std::string name, std::vector<float> feature)
     if (it == features.end()) {
         features.insert(map<string, vector<float>>::value_type(name, feature));
         save_feature();
-	return 0;
+        return 0;
     } else
-	return -1;
+	     return -1;
 }
 
 int FeatureDB::del_feature(const std::string name)
@@ -36,9 +36,9 @@ int FeatureDB::del_feature(const std::string name)
     if (it != features.end()) {
         features.erase(name);
         save_feature();
-	return 0;
+        return 0;
     } else
-	return -1;
+        return -1;
 }
 std::string FeatureDB::find_name(std::vector<float> feature)
 {
@@ -73,11 +73,11 @@ void FeatureDB::save_feature()
     while(it != features.end()) {
         of << it->first << ",";
 
-	for (int i = 0; i != it->second.size(); ++i) {
+        for (int i = 0; i != it->second.size(); ++i) {
             of << it->second[i] << ",";
         }
 
-	of << endl;
+        of << endl;
         it ++;
     }
 
@@ -88,29 +88,28 @@ void FeatureDB::load_feature()
 
     if (!inf.is_open()) {
         cout << "Error opening file" << endl;
-       	exit (1);
+        exit (1);
     }
 
     while (!inf.eof()) {
-	char buffer[4096];
-	std::string name;
+        char buffer[4096];
+        std::string name;
 
-	inf.getline (buffer, 4096);
-	if (strlen(buffer) < 4)
+        inf.getline (buffer, 4096);
+        if (strlen(buffer) < 4)
             continue;
 
         char *token = strtok(buffer, ",");
-	name = token;
+        name = token;
 
         std::vector<float> feature;
-	float tmp;
+        float tmp;
+        while((token = strtok(NULL, ",")) != NULL) {
+            tmp = atof(token);
+            feature.push_back(tmp);
+        }
 
-	while((token = strtok(NULL, ",")) != NULL) {
-	    tmp = atof(token);
-	    feature.push_back(tmp);
-	}
-
-	features.insert(map<string, vector<float>>::value_type(name, feature));
+        features.insert(map<string, vector<float>>::value_type(name, feature));
     }
 }
 

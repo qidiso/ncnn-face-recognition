@@ -60,18 +60,18 @@ bp::list FaceRecognition::recognize(int rows,int cols,bp::str img_data)
     const int num = align(img, aligned_face);
     for (int i = 0; i < num; i ++) {
         std::vector<float> feature;
-	std::string name;
-	bp::list rect;
-	bp::dict res;
+        std::string name;
+        bp::list rect;
+        bp::dict res;
 
-	mobilefacenet->start(aligned_face[i].face, feature);
-	name = featuredb->find_name(feature);
+        mobilefacenet->start(aligned_face[i].face, feature);
+        name = featuredb->find_name(feature);
         rect.append(aligned_face[i].rect[0]);
         rect.append(aligned_face[i].rect[1]);
-	rect.append(aligned_face[i].rect[2]);
-	rect.append(aligned_face[i].rect[3]);
-	res["name"] = name;
-	res["rect"] = rect;
+        rect.append(aligned_face[i].rect[2]);
+        rect.append(aligned_face[i].rect[3]);
+        res["name"] = name;
+        res["rect"] = rect;
         recog_result.append(res);
     }
 
@@ -118,14 +118,14 @@ int FaceRecognition::align(cv::Mat image, std::vector<AlignedFace> &aligned_face
 
     const int num_box = bboxes.size();
     for (int i = 0; i < num_box; i++) {
-	AlignedFace face;
+        AlignedFace face;
         vector<cv::Point2f> coord5points;
         vector<cv::Point2f> facePointsByMtcnn;
 
         face.rect[0] = bboxes[i].x1;
         face.rect[1] = bboxes[i].y1;
-	face.rect[2] = bboxes[i].x2 - bboxes[i].x1 + 1;
-	face.rect[3] = bboxes[i].y2 - bboxes[i].y1 + 1;
+        face.rect[2] = bboxes[i].x2 - bboxes[i].x1 + 1;
+        face.rect[3] = bboxes[i].y2 - bboxes[i].y1 + 1;
 
         for (int j = 0; j < 5; j ++) {
             facePointsByMtcnn.push_back(cvPoint(bboxes[i].ppoint[j], bboxes[i].ppoint[j + 5]));
@@ -139,7 +139,7 @@ int FaceRecognition::align(cv::Mat image, std::vector<AlignedFace> &aligned_face
         warp_mat.convertTo(warp_mat, CV_32FC1);
         face.face = cv::Mat::zeros(112, 112, image.type());
         warpAffine(image, face.face, warp_mat, face.face.size());
-	aligned_face.push_back(face);
+        aligned_face.push_back(face);
     }
 
     return num_box;

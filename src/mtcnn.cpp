@@ -66,9 +66,7 @@ void MTCNN::SetMinFace(int minSize){
 void MTCNN::generateBbox(ncnn::Mat score, ncnn::Mat location, std::vector<Bbox>& boundingBox_, float scale){
     const int stride = 2;
     const int cellsize = 12;
-    //score p
-    float *p = score.channel(1);//score.data + score.cstep;
-    //float *plocal = location.data;
+    float *p = score.channel(1);
     Bbox bbox;
     float inv_scale = 1.0f/scale;
     for(int row=0;row<score.h;row++){
@@ -87,7 +85,6 @@ void MTCNN::generateBbox(ncnn::Mat score, ncnn::Mat location, std::vector<Bbox>&
                 boundingBox_.push_back(bbox);
             }
             p++;
-            //plocal++;
         }
     }
 }
@@ -123,7 +120,6 @@ void MTCNN::nmsTwoBoxs(vector<Bbox>& boundingBox_, vector<Bbox>& previousBox_, c
                 IOU = IOU / ((boundingBox_.at(i).area < previousBox_.at(j).area) ? boundingBox_.at(i).area : previousBox_.at(j).area);
             }
             if (IOU > overlap_threshold&&boundingBox_.at(i).score>previousBox_.at(j).score) {
-            //if (IOU > overlap_threshold) {
                 itx = boundingBox_.erase(itx);
             }
             else {
@@ -204,8 +200,6 @@ void MTCNN::refine(vector<Bbox> &vecBbox, const int &height, const int &width, b
         x2 = (*it).x2 + (*it).regreCoord[2]*bbw;
         y2 = (*it).y2 + (*it).regreCoord[3]*bbh;
 
-        
-        
         if(square){
             w = x2 - x1 + 1;
             h = y2 - y1 + 1;
@@ -248,7 +242,7 @@ void MTCNN::PNet(float scale)
     resize_bilinear(img, in, ws, hs);
     ncnn::Extractor ex = Pnet.create_extractor();
     ex.set_light_mode(true);
-    ex.set_num_threads(2);
+    //ex.set_num_threads(2);
     ex.input("data", in);
     ncnn::Mat score_, location_;
     ex.extract("prob1", score_);
@@ -280,7 +274,7 @@ void MTCNN::PNet(){
         ncnn::Mat in;
         resize_bilinear(img, in, ws, hs);
         ncnn::Extractor ex = Pnet.create_extractor();
-        ex.set_num_threads(2);
+        //ex.set_num_threads(2);
         ex.set_light_mode(true);
         ex.input("data", in);
         ncnn::Mat score_, location_;
@@ -302,7 +296,7 @@ void MTCNN::RNet(){
         ncnn::Mat in;
         resize_bilinear(tempIm, in, 24, 24);
         ncnn::Extractor ex = Rnet.create_extractor();
-    ex.set_num_threads(2);
+        //ex.set_num_threads(2);
         ex.set_light_mode(true);
         ex.input("data", in);
         ncnn::Mat score, bbox;
@@ -326,7 +320,7 @@ void MTCNN::ONet(){
         ncnn::Mat in;
         resize_bilinear(tempIm, in, 48, 48);
         ncnn::Extractor ex = Onet.create_extractor();
-    ex.set_num_threads(2);
+        //ex.set_num_threads(2);
         ex.set_light_mode(true);
         ex.input("data", in);
         ncnn::Mat score, bbox, keyPoint;
