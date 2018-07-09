@@ -26,7 +26,17 @@ int FeatureDB::add_feature(const std::string name, std::vector<float> feature)
         save_feature();
         return 0;
     } else
-	     return -1;
+        return -1;
+}
+std::vector<std::string> FeatureDB::get_names()
+{
+    map<string,vector<float>>::iterator it = features.begin();
+    std::vector<std::string> names;
+
+    for (;it != features.end(); ++it) {
+        names.push_back(it->first);
+    }
+    return names;
 }
 
 int FeatureDB::del_feature(const std::string name)

@@ -78,6 +78,19 @@ bp::list FaceRecognition::recognize(int rows,int cols,bp::str img_data)
     return recog_result;
 }
 
+bp::list FaceRecognition::get_names()
+{
+    bp::list ret;
+    std::vector<std::string> names = featuredb->get_names();
+    vector<std::string>::iterator it = names.begin();
+
+    for (;it !=  names.end(); ++it) {
+        ret.append(*it);
+    }
+    return ret;
+
+}
+
 int FaceRecognition::add_person(bp::str str, int rows,int cols,bp::str img_data)
 {
     unsigned char *data = (unsigned char *) ((const char *) bp::extract<const char *>(img_data));
@@ -86,7 +99,6 @@ int FaceRecognition::add_person(bp::str str, int rows,int cols,bp::str img_data)
     std::vector<AlignedFace> aligned_face;
 
     const int num  = align(img, aligned_face);
-    cout << "add_person" << endl;
     if (num == 1){
         std::vector<float> feature;
         mobilefacenet->start(aligned_face[0].face, feature);
@@ -150,5 +162,6 @@ BOOST_PYTHON_MODULE (facerecognition)
     bp::class_<FaceRecognition>("FaceRecognition", bp::init<bp::str, float>())
             .def("add_person", &FaceRecognition::add_person)
             .def("del_person", &FaceRecognition::del_person)
+            .def("get_names", &FaceRecognition::get_names)
             .def("recognize", &FaceRecognition::recognize);
 }

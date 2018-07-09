@@ -21,6 +21,7 @@ public:
     int add_feature(const std::string name, std::vector<float> feature);
     int del_feature(const std::string name);
     std::string find_name(std::vector<float> feature);
+    std::vector<std::string> get_names();
 private:
     void save_feature();
     void load_feature();

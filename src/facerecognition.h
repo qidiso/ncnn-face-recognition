@@ -38,6 +38,7 @@ public:
     bp::list recognize(int rows,int cols,bp::str img_data);
     int add_person(bp::str str, int rows,int cols,bp::str img_data);
     int del_person(bp::str str);
+    bp::list get_names();
 
 private:
     std::string modulepath;
