@@ -49,6 +49,14 @@ FaceRecognition::~FaceRecognition()
     delete mobilefacenet;
     delete featuredb;
 }
+#include <sys/time.h>
+double get_current_time()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    return tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0;
+}
 
 bp::list FaceRecognition::recognize(int rows,int cols,bp::str img_data)
 {
