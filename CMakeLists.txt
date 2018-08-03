@@ -13,12 +13,19 @@ include_directories(/include
 	            ${CMAKE_CURRENT_LIST_DIR}/src)
 
 
-list(APPEND LINKER_LIBS opencv_imgcodecs opencv_core opencv_highgui opencv_imgproc opencv_video ncnn)
+list(APPEND LINKER_LIBS opencv_videoio opencv_video opencv_imgcodecs opencv_core opencv_highgui opencv_imgproc ncnn)
 
 file(GLOB SRC ${CMAKE_CURRENT_LIST_DIR}/src/*.h
-              ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp)
+              ${CMAKE_CURRENT_LIST_DIR}/src/featuredb.cpp
+	      ${CMAKE_CURRENT_LIST_DIR}/src/mobilefacenet.cpp
+	      ${CMAKE_CURRENT_LIST_DIR}/src/mtcnn.cpp)
 
-#add_executable(mobilefacenet_ncnn ${MBF_COMPILE_CODE})
-add_library(facerecognition SHARED ${SRC})
+file(GLOB BINSRC ${CMAKE_CURRENT_LIST_DIR}/src/tcpsender.cpp)
+add_executable(tcpsender ${SRC} ${BINSRC})
+set_target_properties(tcpsender PROPERTIES PREFIX "")
+target_link_libraries(tcpsender ${LINKER_LIBS})
+
+file(GLOB LIBSRC ${CMAKE_CURRENT_LIST_DIR}/src/facerecognition.cpp)
+add_library(facerecognition SHARED ${SRC} ${LIBSRC})
 set_target_properties(facerecognition PROPERTIES PREFIX "")
 target_link_libraries(facerecognition ${LINKER_LIBS} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES})
