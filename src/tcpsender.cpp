@@ -104,7 +104,6 @@ int alignFce2(cv::Mat &image)
 int main()
 {
     int sock=socket(AF_INET,SOCK_STREAM,0);
-    cv::VideoCapture cap("rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream");
     if (sock < 0) {
         printf("socket()\n");
     }
@@ -123,8 +122,10 @@ int main()
         close(sock);
         return 2;
     }
+    cv::VideoCapture cap1("rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream");
+    cv::VideoCapture cap2("rtsp://admin:a12345678@192.168.1.17/h264/ch1/sub/av_stream");
     printf("listen success\n");
-
+#if 0
     while(0) {
     
         cv::Mat frame;
@@ -136,7 +137,7 @@ int main()
 	
 	}
     }
-
+#endif
     socklen_t len=0;
     int client_sock=accept(sock, (struct sockaddr*)&socket, &len);
     if(client_sock < 0) {
@@ -156,11 +157,17 @@ int main()
 	    continue;
 	}
 resend:
-        cv::Mat frame;
-        cap.read(frame);
+        cv::Mat frame1;
+        cv::Mat frame2;
+        cap1.read(frame1);
+        cap2.read(frame2);
+        alignFce2(frame1);
+        alignFce2(frame2);
 
-        if(frame.type() == CV_8UC3) {
-            alignFce2(frame);
+        if(frame1.type() == CV_8UC3 && frame2.type() == CV_8UC3) {
+            cv::Mat frame;
+            frame.push_back(frame);
+            frame.push_back(frame);
             cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
             //cv::resize(yuvImg, yuvImg, cv::Size(),0.5,0.5);
 
@@ -168,7 +175,7 @@ resend:
 //            printf("wait...ret =%d, %f\n", ret, get_current_time());
         } else {
 	    usleep(100);
-	    printf("Error reading %d %d\n",frame.rows , frame.cols);
+	    printf("Error reading \n");
 	    goto resend;
 	}
 
