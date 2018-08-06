@@ -4,8 +4,12 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <opencv2/opencv.hpp>
+#include <pthread.h>
+#include <iostream>
 #define _PORT_ 9999
 #define _BACKLOG_ 10
+
+using namespace std;
 
 #include <sys/time.h>
 double get_current_time()
@@ -20,7 +24,6 @@ double get_current_time()
 #include "mtcnn.h"
 #include "featuredb.h"
 
-MTCNN *mtcnn2 = NULL;
 cv::Mat getsrc_roi2(std::vector<cv::Point2f> x0, std::vector<cv::Point2f> dst)
 {
     int size = dst.size();
@@ -55,7 +58,7 @@ cv::Mat getsrc_roi2(std::vector<cv::Point2f> x0, std::vector<cv::Point2f> dst)
     return roi;
 }
 
-int alignFce2(cv::Mat &image)
+int face_recognition(cv::Mat &image, MTCNN *mtcnn, MobileFaceNet* mobilefacenet, FeatureDB* featuredb)
 {
     double dst_landmark[10] = {
                 38.2946, 73.5318, 55.0252, 41.5493, 70.7299,
@@ -64,11 +67,7 @@ int alignFce2(cv::Mat &image)
     ncnn::Mat ncnn_img = ncnn::Mat::from_pixels(image.data, ncnn::Mat::PIXEL_BGR2RGB, image.cols, image.rows);
     std::vector<Bbox> bboxes;
 
-    if (mtcnn2 == NULL) {
-        cout << "new mtcnn" << endl;
-        mtcnn2 = new MTCNN("/root/livemediastreamer/build/models");
-    }
-    mtcnn2->detect(ncnn_img, bboxes);
+    mtcnn->detect(ncnn_img, bboxes);
     //mtcnn->detectMaxFace(ncnn_img, bboxes);
 
     const int num_box = bboxes.size();
@@ -91,15 +90,52 @@ int alignFce2(cv::Mat &image)
         warp_mat.convertTo(warp_mat, CV_32FC1);
         face = cv::Mat::zeros(112, 112, image.type());
         warpAffine(image, face, warp_mat, face.size());
+
+	std::vector<float> feature;
+        mobilefacenet->start(face, feature);
+	std::string name = featuredb->find_name(feature);
+	cv::putText(image, name, cv::Point(bboxes[i].x1, bboxes[i].y1), cv::FONT_HERSHEY_COMPLEX, 2, cv::Scalar(0, 255, 255), 2, 8, 0);
         cv::rectangle(image, rect, cv::Scalar(0,0,255),3,1,0);
     }
-
-    if (num_box == 0)
-            cout << "000000000000000000" << endl;
 
     return num_box;
 }
 
+#define CAMERA_NUMBER 4
+std::string url[] = {"rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream",
+		     "rtsp://admin:a12345678@192.168.1.17/h264/ch1/sub/av_stream",
+		     "rtsp://admin:a12345678@192.168.1.18/h264/ch1/sub/av_stream",
+		     "rtsp://admin:a12345678@192.168.1.19/h264/ch1/sub/av_stream"};
+cv::Mat globalframe[CAMERA_NUMBER];
+bool finished = false;
+
+void* cv_thread(void *parm)
+{
+    int index = *(int*)parm;
+    printf("===========%d=====\n", index);
+
+    std::string modulepath = "/root/livemediastreamer/build/models";
+    MTCNN *mtcnn2 = new MTCNN(modulepath);
+    MobileFaceNet *mobilefacenet = new MobileFaceNet(modulepath);
+    FeatureDB *featuredb = new FeatureDB(modulepath, 0.63);
+    printf("===========%d==222===\n", index);
+    cv::VideoCapture cap(url[index]);
+    finished = true;
+    cout << url[index] << "Opened" << endl;
+
+
+    while(1) {
+        cv::Mat frame;
+        int ret = cap.read(frame);
+
+	if (ret == 0)
+	    printf("read error");
+//        else
+//	    cout <<  url[index] << "...Readed" << endl;
+	face_recognition(frame, mtcnn2, mobilefacenet, featuredb);
+        globalframe[index] = frame.clone();
+    }
+}
 
 int main()
 {
@@ -122,20 +158,41 @@ int main()
         close(sock);
         return 2;
     }
-    cv::VideoCapture cap1("rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream");
-    cv::VideoCapture cap2("rtsp://admin:a12345678@192.168.1.17/h264/ch1/sub/av_stream");
+    //cv::VideoCapture cap1("rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream");
+    //cv::VideoCapture cap2("rtsp://admin:a12345678@192.168.1.17/h264/ch1/sub/av_stream");
+    pthread_t t[CAMERA_NUMBER];
+
+    for (int i = 0; i < CAMERA_NUMBER; i ++) {
+	finished = false;
+        if(pthread_create(&t[i], NULL, cv_thread, (void*)&i) == -1){
+            puts("fail to create pthread t0");
+            exit(1);
+        }
+
+	while (!finished);
+    }
+    
     printf("listen success\n");
 #if 0
-    while(0) {
-    
-        cv::Mat frame;
-        cap.read(frame);
-	if(frame.type() != CV_8UC3) {
-	    printf("Error reading\n");
-	} else {
-	    printf("reading OK\n");
-	
-	}
+    while(1) {
+        cv::Mat frame1;
+        cv::Mat frame2;
+        cap1.read(frame1);
+        cap2.read(frame2);
+
+        cv::Mat f1clone = frame1.clone();
+
+        if(frame1.type() == CV_8UC3 && frame2.type() == CV_8UC3) {
+            alignFce2(f1clone);
+            alignFce2(f2clone);
+            cv::Mat frame;
+            frame.push_back(f1clone);
+            frame.push_back(f2clone);
+            cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
+        } else {
+            usleep(100 * 1000);
+            printf("Error reading \n");
+        }
     }
 #endif
     socklen_t len=0;
@@ -147,40 +204,58 @@ int main()
     printf("get connect\n");
     char buf[4];
 
+
+#if 1
     while(1) {
 //         printf("start sending 111---\n");
         int ret = read(client_sock, buf, 4);
         if (ret == 4 && buf[0] == 0x11 && buf[1] == 0x22 && buf[2] == 0x33 && buf[3] == 0x44) {
-//            printf("start sending---\n");
+    		printf("start sending---\n");
         } else {
 //         printf("start sending 222---\n");
 	    continue;
 	}
 resend:
-        cv::Mat frame1;
-        cv::Mat frame2;
-        cap1.read(frame1);
-        cap2.read(frame2);
-        alignFce2(frame1);
-        alignFce2(frame2);
+#if 0
+        int ret1 = cap1.read(frame1);
+        int ret2 = cap2.read(frame2);
+	cout << ret1 << ret2 << endl;
+
+	cv::Mat f1clone = frame1.clone();
+	cv::Mat f2clone = frame2.clone();
 
         if(frame1.type() == CV_8UC3 && frame2.type() == CV_8UC3) {
+        //if(frame1.type() == CV_8UC3 ) {
+            //alignFce2(f1clone);
+            //alignFce2(f2clone);
             cv::Mat frame;
-            frame.push_back(frame);
-            frame.push_back(frame);
+            frame.push_back(f1clone);
+            frame.push_back(f2clone);
             cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
             //cv::resize(yuvImg, yuvImg, cv::Size(),0.5,0.5);
 
             int ret = write(client_sock, frame.data, frame.rows * frame.cols);
-//            printf("wait...ret =%d, %f\n", ret, get_current_time());
+            printf("wait...ret =%d, %f\n", ret, get_current_time());
         } else {
-	    usleep(100);
+	    usleep(100 * 1000);
 	    printf("Error reading \n");
 	    goto resend;
 	}
+#endif
+	cv::Mat combine1,combine2,frame;
+	cv::hconcat(globalframe[0],globalframe[1],combine1);
+	cv::hconcat(globalframe[2],globalframe[3],combine2);
+	cv::vconcat(combine1,combine2,frame);
+
+	//cv::Mat frame;
+	//frame.push_back(globalframe[0]);
+	//frame.push_back(globalframe[1]);
+	cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
+	ret = write(client_sock, frame.data, frame.rows * frame.cols);
 
     }
-    close(client_sock);
+#endif
+    //close(client_sock);
     close(sock);
     return 0;
 }

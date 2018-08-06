@@ -23,7 +23,7 @@ file(GLOB SRC ${CMAKE_CURRENT_LIST_DIR}/src/*.h
 file(GLOB BINSRC ${CMAKE_CURRENT_LIST_DIR}/src/tcpsender.cpp)
 add_executable(tcpsender ${SRC} ${BINSRC})
 set_target_properties(tcpsender PROPERTIES PREFIX "")
-target_link_libraries(tcpsender ${LINKER_LIBS})
+target_link_libraries(tcpsender ${LINKER_LIBS} pthread)
 
 file(GLOB LIBSRC ${CMAKE_CURRENT_LIST_DIR}/src/facerecognition.cpp)
 add_library(facerecognition SHARED ${SRC} ${LIBSRC})
