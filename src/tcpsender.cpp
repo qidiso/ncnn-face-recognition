@@ -58,7 +58,13 @@ cv::Mat getsrc_roi2(std::vector<cv::Point2f> x0, std::vector<cv::Point2f> dst)
     return roi;
 }
 
-int face_recognition(cv::Mat &image, MTCNN *mtcnn, MobileFaceNet* mobilefacenet, FeatureDB* featuredb)
+struct RecognitionResult{
+	cv::Rect rect;
+	std::string name;
+
+};
+
+std::vector<RecognitionResult>  face_recognition(cv::Mat &image, MTCNN *mtcnn, MobileFaceNet* mobilefacenet, FeatureDB* featuredb)
 {
     double dst_landmark[10] = {
                 38.2946, 73.5318, 55.0252, 41.5493, 70.7299,
@@ -66,6 +72,7 @@ int face_recognition(cv::Mat &image, MTCNN *mtcnn, MobileFaceNet* mobilefacenet,
 
     ncnn::Mat ncnn_img = ncnn::Mat::from_pixels(image.data, ncnn::Mat::PIXEL_BGR2RGB, image.cols, image.rows);
     std::vector<Bbox> bboxes;
+    std::vector<RecognitionResult> ret;
 
     mtcnn->detect(ncnn_img, bboxes);
     //mtcnn->detectMaxFace(ncnn_img, bboxes);
@@ -94,14 +101,17 @@ int face_recognition(cv::Mat &image, MTCNN *mtcnn, MobileFaceNet* mobilefacenet,
 	std::vector<float> feature;
         mobilefacenet->start(face, feature);
 	std::string name = featuredb->find_name(feature);
-	cv::putText(image, name, cv::Point(bboxes[i].x1, bboxes[i].y1), cv::FONT_HERSHEY_COMPLEX, 2, cv::Scalar(0, 255, 255), 2, 8, 0);
-        cv::rectangle(image, rect, cv::Scalar(0,0,255),3,1,0);
+
+	RecognitionResult aaa;
+	aaa.rect = rect;
+	aaa.name = name;
+	ret.push_back(aaa);
     }
 
-    return num_box;
+    return ret;
 }
 
-#define CAMERA_NUMBER 4
+#define CAMERA_NUMBER 3
 std::string url[] = {"rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream",
 		     "rtsp://admin:a12345678@192.168.1.17/h264/ch1/sub/av_stream",
 		     "rtsp://admin:a12345678@192.168.1.18/h264/ch1/sub/av_stream",
@@ -114,6 +124,16 @@ void* cv_thread(void *parm)
     int index = *(int*)parm;
     printf("===========%d=====\n", index);
 
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(index + 1,&mask);
+    printf("thread %u, i = %d\n", pthread_self(), index + 1);
+    if(-1 == pthread_setaffinity_np(pthread_self() ,sizeof(mask),&mask))
+    {
+        fprintf(stderr, "pthread_setaffinity_np erro\n");
+        return NULL;
+    }
+
     std::string modulepath = "/root/livemediastreamer/build/models";
     MTCNN *mtcnn2 = new MTCNN(modulepath);
     MobileFaceNet *mobilefacenet = new MobileFaceNet(modulepath);
@@ -124,21 +144,40 @@ void* cv_thread(void *parm)
     cout << url[index] << "Opened" << endl;
 
 
+	bool need = true;
+	std::vector<RecognitionResult> ret;
     while(1) {
         cv::Mat frame;
-        int ret = cap.read(frame);
+        int capret = cap.read(frame);
 
-	if (ret == 0)
+	if (capret == 0)
 	    printf("read error");
 //        else
 //	    cout <<  url[index] << "...Readed" << endl;
-	face_recognition(frame, mtcnn2, mobilefacenet, featuredb);
+        if (need)
+   	    ret = face_recognition(frame, mtcnn2, mobilefacenet, featuredb);
+	need = !need;
+
+	for(int i = 0; i < ret.size(); i ++) {
+  	cv::putText(frame, ret[i].name, ret[i].rect.tl(), cv::FONT_HERSHEY_COMPLEX, 2, cv::Scalar(0, 255, 255), 2, 8, 0);
+        cv::rectangle(frame, ret[i].rect, cv::Scalar(0,0,255),3,1,0);
+	}
         globalframe[index] = frame.clone();
     }
 }
 
 int main()
 {
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(3,&mask);
+    printf("thread %u, i = %d\n", pthread_self(), 0);
+    if(-1 == pthread_setaffinity_np(pthread_self() ,sizeof(mask),&mask))
+    {
+        fprintf(stderr, "pthread_setaffinity_np erro\n");
+        return NULL;
+    }
+
     int sock=socket(AF_INET,SOCK_STREAM,0);
     if (sock < 0) {
         printf("socket()\n");
@@ -210,7 +249,7 @@ int main()
 //         printf("start sending 111---\n");
         int ret = read(client_sock, buf, 4);
         if (ret == 4 && buf[0] == 0x11 && buf[1] == 0x22 && buf[2] == 0x33 && buf[3] == 0x44) {
-    		printf("start sending---\n");
+    	//	printf("start sending---\n");
         } else {
 //         printf("start sending 222---\n");
 	    continue;
@@ -243,8 +282,10 @@ resend:
 	}
 #endif
 	cv::Mat combine1,combine2,frame;
+	cv::Mat temp = cv::Mat::zeros(480, 640, globalframe[0].type());
 	cv::hconcat(globalframe[0],globalframe[1],combine1);
-	cv::hconcat(globalframe[2],globalframe[3],combine2);
+	//cv::hconcat(globalframe[2],globalframe[3],combine2);
+	cv::hconcat(globalframe[2], temp,combine2);
 	cv::vconcat(combine1,combine2,frame);
 
 	//cv::Mat frame;
