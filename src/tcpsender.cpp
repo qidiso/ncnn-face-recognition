@@ -97,6 +97,13 @@ FeatureDB *featuredb;
 cv::Mat globalframe[CAMERA_NUMBER];
 std::vector<RecognitionResult> result[CAMERA_NUMBER];
 
+#define TRAINING_CMD_NULL 0
+#define TRAINING_CMD_ADD 1
+#define TRAINING_CMD_DEL 2
+
+int trainingcmd = TRAINING_CMD_NULL;
+char newname[1024];
+
 //std::vector<RecognitionResult>  face_recognition(cv::Mat &image, int index)
 void * face_recognition(void* parm)
 {
@@ -138,6 +145,14 @@ void * face_recognition(void* parm)
 
 	std::vector<float> feature;
         mobilefacenet[index]->start(face, feature);
+	if (trainingcmd == TRAINING_CMD_ADD && index == 0) {
+            if (featuredb->add_feature(newname, feature) == 0) {
+	        trainingcmd = TRAINING_CMD_NULL;
+	    }
+	} else if (trainingcmd == TRAINING_CMD_DEL && index == 0) {
+            featuredb->del_feature(newname);
+	    trainingcmd = TRAINING_CMD_NULL;
+	}
 	std::string name = featuredb->find_name(feature);
 
 	RecognitionResult aaa;
@@ -177,6 +192,49 @@ void* cv_thread(void *parm)
     }
 }
 
+void* udp_listen_training_cmd(void*)
+{
+    int sockfd=socket(AF_INET,SOCK_DGRAM,0);
+
+    struct sockaddr_in addr;
+    addr.sin_family =AF_INET;
+    addr.sin_port =htons(5050);
+    addr.sin_addr.s_addr=inet_addr("127.0.0.1");
+
+    int ret =bind(sockfd,(struct sockaddr*)&addr,sizeof(addr));
+    if(0>ret)
+    {
+        printf("bind\n");
+        return NULL;
+
+    }
+    struct sockaddr_in cli;
+    socklen_t len=sizeof(cli);
+    char buf[1024];
+
+    printf("udp_listen_training_cmd OK\n");
+    while(1)
+    {
+        recvfrom(sockfd,&buf,sizeof(buf),0,(struct sockaddr*)&cli,&len);
+
+	if (strncmp(buf, "ADD:", 4) == 0) {
+            trainingcmd = TRAINING_CMD_ADD;
+	    strcpy(newname, buf + 4);
+	} else if (strncmp(buf, "DEL:", 4) == 0) {
+            trainingcmd = TRAINING_CMD_DEL;
+	    strcpy(newname, buf + 4);
+	} else {
+            printf("Invilid Training Command %s\n",buf);
+	}
+
+
+
+    }
+    close(sockfd);
+        return NULL;
+
+}
+
 int main()
 {
 
@@ -201,8 +259,8 @@ int main()
     }
     pthread_t t[CAMERA_NUMBER];
 
-    std::string modulepath = "/root/livemediastreamer/build/models";
-    featuredb = new FeatureDB(modulepath, 0.63);
+    std::string modulepath = "./models";
+    featuredb = new FeatureDB(modulepath, 0.70);
     for (int i = 0; i < CAMERA_NUMBER; i ++) {
         mtcnn[i] = new MTCNN(modulepath);
         mobilefacenet[i] = new MobileFaceNet(modulepath);
@@ -218,6 +276,11 @@ int main()
 
 	while (!finished);
     }
+    pthread_t udpt;
+    if(pthread_create(&udpt, NULL, udp_listen_training_cmd, NULL) == -1){
+        puts("fail to create pthread t0");
+        exit(1);
+    }
     
     printf("listen success\n");
     socklen_t len=0;
@@ -230,10 +293,11 @@ int main()
     char buf[4];
 
     cv::Mat combine1,combine2,frame;
+#if 0
     cv::hconcat(globalframe[0],globalframe[1],frame);
     cv::Mat buff[8] = {frame, frame, frame, frame, frame, frame, frame,frame};
     int bufindex = 0;
-
+#endif
     while(1) {
         int ret = read(client_sock, buf, 4);
         if (ret == 4 && buf[0] == 0x11 && buf[1] == 0x22 && buf[2] == 0x33 && buf[3] == 0x44) {
@@ -249,9 +313,9 @@ resend:
 	cv::vconcat(combine1,combine2,frame);
 #else
 	cv::hconcat(globalframe[0],globalframe[1],frame);
-	buff[bufindex] = frame;
-	bufindex = bufindex != 7 ? bufindex + 1 : 0;
-	frame = buff[bufindex];
+//	buff[bufindex] = frame;
+//	bufindex = bufindex != 7 ? bufindex + 1 : 0;
+//	frame = buff[bufindex];
 #endif
 
 	cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
