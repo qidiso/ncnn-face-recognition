@@ -235,9 +235,13 @@ void* udp_listen_training_cmd(void*)
 
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-
+    if (argc < 3) {
+	    printf("Need two urls for IP cameras\n");
+    }
+    url[0] = argv[1];
+    url[0] = argv[2];
     int sock=socket(AF_INET,SOCK_STREAM,0);
     if (sock < 0) {
         printf("socket()\n");
