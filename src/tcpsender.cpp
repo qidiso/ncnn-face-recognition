@@ -64,17 +64,55 @@ struct RecognitionResult{
 
 };
 
-std::vector<RecognitionResult>  face_recognition(cv::Mat &image, MTCNN *mtcnn, MobileFaceNet* mobilefacenet, FeatureDB* featuredb)
+void draw_name(cv::Mat image, cv::Rect cvrect, std::string name)
 {
+    cv::rectangle(image, cvrect, cv::Scalar(127,255,0),1);
+
+    int rect[] = {cvrect.x, cvrect.y, cvrect.width, cvrect.height};
+    // draw thicking corners
+    int int_x = rect[2]/5;
+    int int_y = rect[3]/5;
+    cv::line(image, cv::Point(rect[0],rect[1]),                  cv::Point(rect[0] + int_x,rect[1]),           cv::Scalar(127,255,0),3);
+    cv::line(image, cv::Point(rect[0],rect[1]),                  cv::Point(rect[0],rect[1]+int_y),             cv::Scalar(127,255,0),3);
+    cv::line(image, cv::Point(rect[0],rect[1]+int_y*4),          cv::Point(rect[0],rect[1]+rect[3]),           cv::Scalar(127,255,0),3);
+    cv::line(image, cv::Point(rect[0],rect[1]+rect[3]),          cv::Point(rect[0] + int_x,rect[1]+rect[3]),   cv::Scalar(127,255,0),3);
+    cv::line(image, cv::Point(rect[0]+ int_x*4,rect[1]+rect[3]), cv::Point(rect[0] + rect[2],rect[1]+rect[3]), cv::Scalar(127,255,0),3);
+    cv::line(image, cv::Point(rect[0] + rect[2],rect[1]+rect[3]),cv::Point(rect[0] + rect[2],rect[1]+int_y*4), cv::Scalar(127,255,0),3);
+    cv::line(image, cv::Point(rect[0] + rect[2],rect[1]+int_y),  cv::Point(rect[0] + rect[2],rect[1]),         cv::Scalar(127,255,0),3);
+    cv::line(image, cv::Point(rect[0] + int_x*4,rect[1]),        cv::Point(rect[0] + rect[2],rect[1]),         cv::Scalar(127,255,0),3);
+    //draw middle line
+    int line_x = rect[2]/8;
+    cv::line(image, cv::Point(rect[0]-line_x,rect[1]+rect[3]/2),        cv::Point(rect[0] + line_x,rect[1]+rect[3]/2),      cv::Scalar(127,255,0),1);
+    cv::line(image, cv::Point(rect[0]+rect[2]/2,rect[1]+rect[3]-line_x),cv::Point(rect[0]+rect[2]/2,rect[1]+rect[3]+line_x),cv::Scalar(127,255,0),1);
+    cv::line(image, cv::Point(rect[0]+line_x*7,rect[1]+rect[3]/2),      cv::Point(rect[0]+line_x*9,rect[1]+rect[3]/2),      cv::Scalar(127,255,0),1);
+    cv::line(image, cv::Point(rect[0]+rect[2]/2,rect[1]-line_x),        cv::Point(rect[0]+rect[2]/2,rect[1]+line_x),        cv::Scalar(127,255,0),1);
+    //write name text
+    cv::putText(image, name,cv::Point(rect[0]+rect[2],rect[1]), cv::FONT_HERSHEY_COMPLEX,int_y*1.0/40, cv::Scalar(242,243,231),2);
+}
+
+#define CAMERA_NUMBER 2
+MTCNN *mtcnn[CAMERA_NUMBER];
+MobileFaceNet *mobilefacenet[CAMERA_NUMBER];
+FeatureDB *featuredb;
+cv::Mat globalframe[CAMERA_NUMBER];
+std::vector<RecognitionResult> result[CAMERA_NUMBER];
+
+//std::vector<RecognitionResult>  face_recognition(cv::Mat &image, int index)
+void * face_recognition(void* parm)
+{
+	int index = *(int*)parm;
     double dst_landmark[10] = {
                 38.2946, 73.5318, 55.0252, 41.5493, 70.7299,
                 51.6963, 51.5014, 71.7366, 92.3655, 92.2041 };
-
+    while(1) {
+   usleep(200 * 1000);
+		    
+    cv::Mat image = globalframe[index];
     ncnn::Mat ncnn_img = ncnn::Mat::from_pixels(image.data, ncnn::Mat::PIXEL_BGR2RGB, image.cols, image.rows);
     std::vector<Bbox> bboxes;
     std::vector<RecognitionResult> ret;
 
-    mtcnn->detect(ncnn_img, bboxes);
+    mtcnn[index]->detect(ncnn_img, bboxes);
     //mtcnn->detectMaxFace(ncnn_img, bboxes);
 
     const int num_box = bboxes.size();
@@ -99,7 +137,7 @@ std::vector<RecognitionResult>  face_recognition(cv::Mat &image, MTCNN *mtcnn, M
         warpAffine(image, face, warp_mat, face.size());
 
 	std::vector<float> feature;
-        mobilefacenet->start(face, feature);
+        mobilefacenet[index]->start(face, feature);
 	std::string name = featuredb->find_name(feature);
 
 	RecognitionResult aaa;
@@ -108,59 +146,32 @@ std::vector<RecognitionResult>  face_recognition(cv::Mat &image, MTCNN *mtcnn, M
 	ret.push_back(aaa);
     }
 
-    return ret;
+    result[index] = ret;
+    }
 }
 
-#define CAMERA_NUMBER 3
 std::string url[] = {"rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream",
 		     "rtsp://admin:a12345678@192.168.1.17/h264/ch1/sub/av_stream",
 		     "rtsp://admin:a12345678@192.168.1.18/h264/ch1/sub/av_stream",
 		     "rtsp://admin:a12345678@192.168.1.19/h264/ch1/sub/av_stream"};
-cv::Mat globalframe[CAMERA_NUMBER];
 bool finished = false;
 
 void* cv_thread(void *parm)
 {
     int index = *(int*)parm;
-    printf("===========%d=====\n", index);
-
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
-    CPU_SET(index + 1,&mask);
-    printf("thread %u, i = %d\n", pthread_self(), index + 1);
-    if(-1 == pthread_setaffinity_np(pthread_self() ,sizeof(mask),&mask))
-    {
-        fprintf(stderr, "pthread_setaffinity_np erro\n");
-        return NULL;
-    }
-
-    std::string modulepath = "/root/livemediastreamer/build/models";
-    MTCNN *mtcnn2 = new MTCNN(modulepath);
-    MobileFaceNet *mobilefacenet = new MobileFaceNet(modulepath);
-    FeatureDB *featuredb = new FeatureDB(modulepath, 0.63);
-    printf("===========%d==222===\n", index);
     cv::VideoCapture cap(url[index]);
     finished = true;
-    cout << url[index] << "Opened" << endl;
+    cout << "Camera " << url[index] << " Opened" << endl;
 
-
-	bool need = true;
-	std::vector<RecognitionResult> ret;
     while(1) {
         cv::Mat frame;
         int capret = cap.read(frame);
 
 	if (capret == 0)
-	    printf("read error");
-//        else
-//	    cout <<  url[index] << "...Readed" << endl;
-        if (need)
-   	    ret = face_recognition(frame, mtcnn2, mobilefacenet, featuredb);
-	need = !need;
+	    printf("read error\n");
 
-	for(int i = 0; i < ret.size(); i ++) {
-  	cv::putText(frame, ret[i].name, ret[i].rect.tl(), cv::FONT_HERSHEY_COMPLEX, 2, cv::Scalar(0, 255, 255), 2, 8, 0);
-        cv::rectangle(frame, ret[i].rect, cv::Scalar(0,0,255),3,1,0);
+	for(int i = 0; i < result[index].size(); i ++) {
+          draw_name(frame, result[index][i].rect, result[index][i].name);
 	}
         globalframe[index] = frame.clone();
     }
@@ -168,15 +179,6 @@ void* cv_thread(void *parm)
 
 int main()
 {
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
-    CPU_SET(3,&mask);
-    printf("thread %u, i = %d\n", pthread_self(), 0);
-    if(-1 == pthread_setaffinity_np(pthread_self() ,sizeof(mask),&mask))
-    {
-        fprintf(stderr, "pthread_setaffinity_np erro\n");
-        return NULL;
-    }
 
     int sock=socket(AF_INET,SOCK_STREAM,0);
     if (sock < 0) {
@@ -197,43 +199,27 @@ int main()
         close(sock);
         return 2;
     }
-    //cv::VideoCapture cap1("rtsp://admin:a12345678@192.168.1.12/h264/ch1/sub/av_stream");
-    //cv::VideoCapture cap2("rtsp://admin:a12345678@192.168.1.17/h264/ch1/sub/av_stream");
     pthread_t t[CAMERA_NUMBER];
 
+    std::string modulepath = "/root/livemediastreamer/build/models";
+    featuredb = new FeatureDB(modulepath, 0.63);
     for (int i = 0; i < CAMERA_NUMBER; i ++) {
+        mtcnn[i] = new MTCNN(modulepath);
+        mobilefacenet[i] = new MobileFaceNet(modulepath);
 	finished = false;
         if(pthread_create(&t[i], NULL, cv_thread, (void*)&i) == -1){
             puts("fail to create pthread t0");
             exit(1);
         }
+        if(pthread_create(&t[i], NULL, face_recognition, (void*)&i) == -1){
+            puts("fail to create pthread t0");
+            exit(1);
+	}
 
 	while (!finished);
     }
     
     printf("listen success\n");
-#if 0
-    while(1) {
-        cv::Mat frame1;
-        cv::Mat frame2;
-        cap1.read(frame1);
-        cap2.read(frame2);
-
-        cv::Mat f1clone = frame1.clone();
-
-        if(frame1.type() == CV_8UC3 && frame2.type() == CV_8UC3) {
-            alignFce2(f1clone);
-            alignFce2(f2clone);
-            cv::Mat frame;
-            frame.push_back(f1clone);
-            frame.push_back(f2clone);
-            cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
-        } else {
-            usleep(100 * 1000);
-            printf("Error reading \n");
-        }
-    }
-#endif
     socklen_t len=0;
     int client_sock=accept(sock, (struct sockaddr*)&socket, &len);
     if(client_sock < 0) {
@@ -243,60 +229,36 @@ int main()
     printf("get connect\n");
     char buf[4];
 
+    cv::Mat combine1,combine2,frame;
+    cv::hconcat(globalframe[0],globalframe[1],frame);
+    cv::Mat buff[8] = {frame, frame, frame, frame, frame, frame, frame,frame};
+    int bufindex = 0;
 
-#if 1
     while(1) {
-//         printf("start sending 111---\n");
         int ret = read(client_sock, buf, 4);
         if (ret == 4 && buf[0] == 0x11 && buf[1] == 0x22 && buf[2] == 0x33 && buf[3] == 0x44) {
-    	//	printf("start sending---\n");
         } else {
-//         printf("start sending 222---\n");
 	    continue;
 	}
 resend:
 #if 0
-        int ret1 = cap1.read(frame1);
-        int ret2 = cap2.read(frame2);
-	cout << ret1 << ret2 << endl;
-
-	cv::Mat f1clone = frame1.clone();
-	cv::Mat f2clone = frame2.clone();
-
-        if(frame1.type() == CV_8UC3 && frame2.type() == CV_8UC3) {
-        //if(frame1.type() == CV_8UC3 ) {
-            //alignFce2(f1clone);
-            //alignFce2(f2clone);
-            cv::Mat frame;
-            frame.push_back(f1clone);
-            frame.push_back(f2clone);
-            cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
-            //cv::resize(yuvImg, yuvImg, cv::Size(),0.5,0.5);
-
-            int ret = write(client_sock, frame.data, frame.rows * frame.cols);
-            printf("wait...ret =%d, %f\n", ret, get_current_time());
-        } else {
-	    usleep(100 * 1000);
-	    printf("Error reading \n");
-	    goto resend;
-	}
-#endif
-	cv::Mat combine1,combine2,frame;
 	cv::Mat temp = cv::Mat::zeros(480, 640, globalframe[0].type());
 	cv::hconcat(globalframe[0],globalframe[1],combine1);
-	//cv::hconcat(globalframe[2],globalframe[3],combine2);
-	cv::hconcat(globalframe[2], temp,combine2);
+	cv::hconcat(globalframe[2],globalframe[3],combine2);
+	//cv::hconcat(globalframe[2], temp,combine2);
 	cv::vconcat(combine1,combine2,frame);
+#else
+	cv::hconcat(globalframe[0],globalframe[1],frame);
+	buff[bufindex] = frame;
+	bufindex = bufindex != 7 ? bufindex + 1 : 0;
+	frame = buff[bufindex];
+#endif
 
-	//cv::Mat frame;
-	//frame.push_back(globalframe[0]);
-	//frame.push_back(globalframe[1]);
 	cv::cvtColor(frame, frame, CV_BGR2YUV_I420);
 	ret = write(client_sock, frame.data, frame.rows * frame.cols);
 
     }
-#endif
-    //close(client_sock);
+    close(client_sock);
     close(sock);
     return 0;
 }
