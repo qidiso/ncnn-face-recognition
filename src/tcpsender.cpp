@@ -241,7 +241,7 @@ int main(int argc, char* argv[])
 	    printf("Need two urls for IP cameras\n");
     }
     url[0] = argv[1];
-    url[0] = argv[2];
+    url[1] = argv[2];
     int sock=socket(AF_INET,SOCK_STREAM,0);
     if (sock < 0) {
         printf("socket()\n");
